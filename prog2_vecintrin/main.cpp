@@ -250,6 +250,44 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
   
+  __cs149_vec_float x;
+  __cs149_vec_int y; 
+  __cs149_vec_float result;// x^y
+  __cs149_vec_int one = _cs149_vset_int(1);
+  __cs149_vec_int zero = _cs149_vset_int(0);
+  __cs149_vec_float nine = _cs149_vset_float(9.999999f);
+  __cs149_mask maskAll, maskNeedMul, maskGt;
+  for(int i=0; i<N; i+=VECTOR_WIDTH){ // for (int i=0; i<N; i++) {
+    if(N-i >= VECTOR_WIDTH){
+      maskAll = _cs149_init_ones();
+    }else{
+      maskAll = _cs149_init_ones(N-i);
+    }
+    
+    //load x, y
+    result = _cs149_vset_float(1);
+    _cs149_vload_float(x, values+i, maskAll); // x = values[i];
+    _cs149_vload_int(y, exponents+i, maskAll); // int y = exponents[i];
+    while(true){
+      maskNeedMul = _cs149_init_ones(0);
+      //get need mult Mask
+      _cs149_vgt_int(maskNeedMul, y, zero, maskAll); 
+      // y==0
+      if(_cs149_cntbits(maskNeedMul) == 0){  //if (y == 0) {
+        break;                               //  output[i] = 1.f;
+      }                                      //}
+                                                     // else 
+      _cs149_vmult_float(result, result, x, maskNeedMul); // result *= x;
+
+      _cs149_vsub_int(y, y, one, maskNeedMul);       // count--;
+
+    }
+    maskGt = _cs149_init_ones(0);
+    _cs149_vgt_float(maskGt, result, nine, maskAll); //if (result > 9.999999f)
+
+    _cs149_vstore_float(output+i, result, maskAll); // output[i] = result;
+    _cs149_vstore_float(output+i, nine, maskGt); // result = 9.999999f;
+  }
 }
 
 // returns the sum of all elements in values
@@ -270,11 +308,23 @@ float arraySumVector(float* values, int N) {
   //
   // CS149 STUDENTS TODO: Implement your vectorized version of arraySumSerial here
   //
-  
+  float result=0;
   for (int i=0; i<N; i+=VECTOR_WIDTH) {
-
+    int n = VECTOR_WIDTH;
+    __cs149_vec_float x;
+    __cs149_mask maskAll = _cs149_init_ones();
+    _cs149_vload_float(x, values+i, maskAll);
+    while(n>1){
+      _cs149_hadd_float(x, x);
+      _cs149_interleave_float(x, x);
+      n/=2;
+    }
+    float tmp;
+    __cs149_mask maskOne = _cs149_init_ones(1);
+    _cs149_vstore_float(&tmp, x, maskOne); 
+    result += tmp;
   }
 
-  return 0.0;
+  return result;
 }
 
